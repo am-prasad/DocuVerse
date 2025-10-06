@@ -1,0 +1,114 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PageWise PDF Q&A</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            body { font-family: 'Inter', sans-serif; }
+            .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+    </head>
+    <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4 text-center">PageWise</h1>
+            <p class="text-gray-600 mb-6 text-center">Upload a PDF document to start asking questions.</p>
+            <div id="status-message" class="hidden p-4 mb-4 text-sm rounded-lg" role="alert"></div>
+            <div class="mb-6">
+                <label for="file-upload" class="block mb-2 text-sm font-medium text-gray-700">1. Upload PDF</label>
+                <div class="flex items-center space-x-4">
+                    <input id="file-upload" name="file" type="file" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept=".pdf">
+                    <button onclick="uploadPDF()" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200 whitespace-nowrap">Upload</button>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="question-input" class="block mb-2 text-sm font-medium text-gray-700">2. Ask a Question</label>
+                <div class="flex items-center space-x-4">
+                    <input type="text" id="question-input" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., What is the main conclusion?">
+                    <button onclick="askQuestion()" id="ask-button" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-200 flex items-center justify-center">
+                        <span id="ask-button-text">Ask</span>
+                        <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6 ml-3 hidden"></div>
+                    </button>
+                </div>
+            </div>
+            <div id="answer-container" class="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200 hidden">
+                <h3 class="font-semibold text-lg text-gray-800 mb-2">Answer:</h3>
+                <div id="answer-text" class="text-gray-700 whitespace-pre-wrap"></div>
+            </div>
+        </div>
+        <script>
+            const statusMessage = document.getElementById('status-message');
+            function showStatus(message, type = 'success') {
+                statusMessage.textContent = message;
+                statusMessage.className = 'p-4 mb-4 text-sm rounded-lg'; // Reset classes
+                if (type === 'success') {
+                    statusMessage.classList.add('bg-green-100', 'text-green-800');
+                } else {
+                    statusMessage.classList.add('bg-red-100', 'text-red-800');
+                }
+            }
+            async function uploadPDF() {
+                const fileInput = document.getElementById('file-upload');
+                if (fileInput.files.length === 0) {
+                    showStatus('Please select a PDF file first.', 'error');
+                    return;
+                }
+                const formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                showStatus('Uploading and processing PDF...', 'success');
+                try {
+                    const response = await fetch("/upload_pdf", { method: "POST", body: formData });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showStatus(data.message, 'success');
+                    } else {
+                        showStatus(data.detail || 'An error occurred.', 'error');
+                    }
+                } catch (error) {
+                    showStatus('Failed to connect to the server.', 'error');
+                }
+            }
+            async function askQuestion() {
+                const questionInput = document.getElementById('question-input');
+                const question = questionInput.value;
+                if (!question.trim()) {
+                    showStatus('Please enter a question.', 'error');
+                    return;
+                }
+                const askButton = document.getElementById('ask-button'), loader = document.getElementById('loader');
+                const askButtonText = document.getElementById('ask-button-text');
+                askButton.disabled = true;
+                askButtonText.classList.add('hidden');
+                loader.classList.remove('hidden');
+                try {
+                    const response = await fetch("/ask", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ question: question })
+                    });
+                    const data = await response.json();
+                    const answerContainer = document.getElementById('answer-container');
+                    const answerText = document.getElementById('answer-text');
+                    if (response.ok) {
+                        answerText.textContent = data.answer;
+                        answerContainer.classList.remove('hidden');
+                        statusMessage.className = 'hidden';
+                    } else {
+                        showStatus(data.detail || data.answer, 'error');
+                        answerContainer.classList.add('hidden');
+                    }
+                } catch (error) {
+                    showStatus('Failed to connect to the server.', 'error');
+                } finally {
+                    askButton.disabled = false;
+                    askButtonText.classList.remove('hidden');
+                    loader.classList.add('hidden');
+                }
+            }
+        </script>
+    </body>
+    </html>
+    
